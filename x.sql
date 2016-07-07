@@ -38,7 +38,12 @@ CREATE TABLE IF NOT EXISTS `user` (
   `country` VARCHAR(45) NULL DEFAULT NULL,
   PRIMARY KEY (`id`));
 
-
+  ALTER TABLE `cnu2016_vtulsyan`.`user`
+  CHANGE COLUMN `email` `email` VARCHAR(255) NOT NULL ,
+  CHANGE COLUMN `first_name` `first_name` VARCHAR(100) NOT NULL ,
+  CHANGE COLUMN `last_name` `last_name` VARCHAR(100) NOT NULL ,
+  DROP PRIMARY KEY,
+  ADD PRIMARY KEY (`id`, `email`, `first_name`, `last_name`);
 
 -- -----------------------------------------------------
 -- Table `cnu2016_vtulsyan`.`order`
