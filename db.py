@@ -252,8 +252,42 @@ def addAllOrders(db, rows):
 '''
 OrderProduct functions
 '''
-def orderProduct(row):
-    
+def getOrderProductRows(orders, products):
+    order_product_map = {}
+    product_name_id_map = {}
+    rows = []
+    for product in products:
+        product_name_id_map[product[1]] = product[0]
+    j = 1 # points to csv data row
+    for i in xrange(len(orders)): # i points to row in orders
+        if j >= len(small_data):
+            break
+        ok = False
+        order = orders[i]
+        row = small_data[j]
+        while small_data[j][13] == 'NULL':
+            j += 1
+        while not ok:
+            row = small_data[j]
+            if abs(float(row[13]) * float(row[14]) - float(order[2])) <= 10**(-6):
+                # checking for equality in amount
+                # MySQLdb returns a Decimal() object and converting it to float
+                # may result in reduction of precision
+                ok = True
+            j += 1
+        if ok: # we have a matching order
+            #print i
+            product_name = row[15]
+            product_id = product_name_id_map[product_name]
+            order_id = order[0]
+            order_product_map[order_id] = (product_id, int(row[13]), float(row[18]), float(row[14]))
+            rows.append((order_id, product_id, int(row[13]), float(row[18]), float(row[14])))
+    return rows
+
+def addAllOrderProducts(db, rows):
+    add_op = """INSERT INTO order_product VALUES (%s, %s, %s, %s, %s)"""
+    db.cursor.executemany(add_op, rows)
+    db.connection.commit()
 
 '''
 Generic functions
@@ -286,8 +320,11 @@ def main():
     #orders = getAllOrders(user_name_id_map)
     #addAllOrders(db, orders)
     orders = select(db, "orders")
-    products = select(db, "products")
-
+    products = select(db, "product")
+    #print len(orders)
+    order_product_rows = getOrderProductRows(orders, products)
+    addAllOrderProducts(db, order_product_rows)
+    #print order_product_rows
 
 
 if __name__ == '__main__':
