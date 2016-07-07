@@ -2,6 +2,7 @@ import json
 import mysql.connector
 import MySQLdb
 import csv
+import datetime
 
 class Database:
     def __init__(self, propertiesFile):
@@ -134,8 +135,136 @@ def getCategoryRow(csvRow, cnt):
     row.append(csvRow[19].decode('utf8'))
     return tuple(row)
 
-def rowLen(row):
-    return len(row)
+'''
+Product functions
+'''
+
+def getProductRow(csvRow):
+    row = []
+    row.append(0)
+    row.append(csvRow[15].decode('utf8'))
+    row.append(csvRow[17].decode('utf8'))
+    row.append(csvRow[12].decode('utf8'))
+    row.append(csvRow[16].decode('utf8'))
+    return tuple(row)
+
+def getUniqueProducts():
+    unique_product_names = set()
+    unique_products = []
+    cnt = 0
+    for row in small_data:
+        if cnt == 0:
+            cnt += 1
+            continue
+        if (row[15].decode('utf8'), row[18].decode('utf8')) not in unique_product_names:
+            unique_product_names.add((row[15].decode('utf8'), row[18].decode('utf8')))
+            unique_products.append(row)
+    return unique_products
+
+def addAllProducts(db, rows):
+    add_product = """INSERT INTO product VALUES (%s, %s, %s, %s, %s)"""
+    db.cursor.executemany(add_product, rows)
+    db.connection.commit()
+
+'''
+CategoryProduct functions
+'''
+def product_category(products, categories):
+    # map from product id to category id
+    product_category_map = {}
+    product_name_id_map = {} # map product name to its id
+    category_name_id_map = {} # map category description to its id
+    for product in products:
+        product_name_id_map[product[1]] = product[0]
+    for category in categories:
+        category_name_id_map[category[2]] = category[0]
+
+    cnt = 0
+    for row in small_data:
+        if cnt == 0:
+            cnt += 1
+            continue
+        product_name = row[15]
+        category_desc = row[19]
+        product_id = product_name_id_map[product_name]
+        category_id = category_name_id_map[category_desc]
+        product_category_map[product_id] = category_id
+        #print product_id, category_id
+    return product_category_map
+
+def getCategoryProductRows(product_category_map):
+    rows = [] #[(category_id, product_id)]
+    for x in product_category_map:
+        rows.append((product_category_map[x], x))
+    return rows
+
+def addCategoryProduct(db, rows):
+    add_p_c = """INSERT INTO category_product VALUES (%s, %s)"""
+    db.cursor.executemany(add_p_c, rows)
+    db.connection.commit()
+
+'''
+Order functions
+'''
+def userNameIdMap(users):
+    # map first name + " " + last name -> user id
+    user_name_id_map = {}
+    for user in users:
+        name = user[2] + " " + user[3]
+        user_name_id_map[name] = user[0]
+    return user_name_id_map
+
+def convertToDateTime(dateStr):
+    if len(dateStr) > 0:
+        if '/' in dateStr:
+            dateList = map(int, dateStr.split("/"))
+            dateObj = datetime.datetime(dateList[0], dateList[1], dateList[2])
+        elif '-' in dateStr:
+            try:
+                dateList = map(int, dateStr.split("-"))
+                dateObj = datetime.datetime(dateList[0], dateList[1], dateList[2])
+            except:
+                dateObj = datetime.datetime(2003,5,20)
+        return dateObj
+    else:
+        return datetime.datetime(2003,5,20)
+
+def getAllOrders(user_name_id_map):
+    rows = []
+    for i in xrange(1, len(small_data)):
+        row = small_data[i]
+        if row[13] == 'NULL':
+            continue
+        name = row[1] + " " + row[2]
+        oid = 0
+        uid = user_name_id_map[name]
+        amount = float(row[13]) * float(row[14])
+        timestamp = convertToDateTime(row[10])
+        status = row[11]
+        rows.append((oid,uid,amount,timestamp,status))
+    return rows
+
+def addAllOrders(db, rows):
+    add_order = """INSERT INTO orders VALUES (%s, %s, %s, %s, %s)"""
+    db.cursor.executemany(add_order, rows)
+    db.connection.commit()
+
+'''
+OrderProduct functions
+'''
+def orderProduct(row):
+    
+
+'''
+Generic functions
+'''
+def select(db, tableName):
+    # returns list of rows in table in the form of list of tuples
+    query = """SELECT * FROM %s""" % (tableName)
+    db.cursor.execute(query)
+    rows = db.cursor.fetchall()
+    #print rows
+    return rows
 
 def main():
     db = Database('properties.json')
@@ -143,8 +272,22 @@ def main():
     readCSV('assignment03-load.csv')
     #unique_users = [getUserRow(row) for row in getUniqueUsers()]
     #addAllUsers(db, unique_users)
-    unique_categories = [getCategoryRow(row, idx) for idx,row in enumerate(getUniqueCategories())]
-    addAllCategories(db, unique_categories)
+    #unique_categories = [getCategoryRow(row, idx) for idx,row in enumerate(getUniqueCategories())]
+    #addAllCategories(db, unique_categories)
+    #unique_products = [getProductRow(row) for row in getUniqueProducts()]
+    #addAllProducts(db, unique_products)
+    #products = select(db, "product")
+    #categories = select(db, "category")
+    #product_category_map = product_category(products, categories)
+    #category_product = getCategoryProductRows(product_category_map)
+    #addCategoryProduct(db, category_product)
+    #users = select(db, "user")
+    #user_name_id_map = userNameIdMap(users)
+    #orders = getAllOrders(user_name_id_map)
+    #addAllOrders(db, orders)
+    orders = select(db, "orders")
+    products = select(db, "products")
+
 
 
 if __name__ == '__main__':
